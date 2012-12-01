@@ -4185,6 +4185,7 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
             Rect invScreenRect = mIsWebViewVisible ? mInvScreenRect : null;
             Rect screenRect = mIsWebViewVisible ? mScreenRect : null;
 
+            Log.e(LOGTAG, "call nativeCreateDrawGLFunction");
             int functor = nativeCreateDrawGLFunction(mNativeClass, invScreenRect,
                     screenRect, mVisibleContentRect, getScale(), extras);
             ((HardwareCanvas) canvas).callDrawGLFunction(functor);
@@ -4270,6 +4271,7 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         }
 
         if (canvas.isHardwareAccelerated()) {
+            Log.e(LOGTAG, "call setHardwareAccelerated() on mZoomManager 'coz canvas is hardware accelerated");
             mZoomManager.setHardwareAccelerated();
         } else {
             mWebViewCore.resumeWebKitDraw();
@@ -8448,8 +8450,11 @@ public final class WebViewClassic implements WebViewProvider, WebViewProvider.Sc
         boolean hwAccelerated = false;
         if (mWebView.isHardwareAccelerated()
                 && mWebView.getLayerType() != View.LAYER_TYPE_SOFTWARE) {
+            Log.e(LOGTAG, "updateHwAccelerated(): yes I am");
             hwAccelerated = true;
         }
+        else
+            Log.e(LOGTAG, "updateHwAccelerated(): no I'm not");
 
         // result is of type LayerAndroid::InvalidateFlags, non zero means invalidate/redraw
         int result = nativeSetHwAccelerated(mNativeClass, hwAccelerated);

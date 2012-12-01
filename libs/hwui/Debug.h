@@ -18,7 +18,7 @@
 #define ANDROID_HWUI_DEBUG_H
 
 // Turn on to check for OpenGL errors on each frame
-#define DEBUG_OPENGL 1
+#define DEBUG_OPENGL 0
 
 // Turn on to display informations about the GPU
 #define DEBUG_EXTENSIONS 0
@@ -57,7 +57,7 @@
 #define DEBUG_SHAPES 0
 
 // Turn on to display debug info about textures
-#define DEBUG_TEXTURES 0
+#define DEBUG_TEXTURES 1
 
 // Turn on to display debug info about the layer renderer
 #define DEBUG_LAYER_RENDERER 0

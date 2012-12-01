@@ -25,6 +25,9 @@ import android.os.Binder;
 import android.os.Build.VERSION_CODES;
 import android.os.RemoteException;
 import android.provider.Settings;
+import android.net.NetworkInfo;
+import android.net.NetworkInfo.DetailedState;
+import android.util.Log;
 
 import java.net.InetAddress;
 
@@ -397,11 +400,20 @@ public class ConnectivityManager {
         }
     }
 
+    private static NetworkInfo myHackNetworkInfo = new NetworkInfo(TYPE_ETHERNET, 0, "ETHERNET", "");
+
+
     public NetworkInfo getNetworkInfo(int networkType) {
+	Log.w("DebugConnManager", "getNetworkInfo() on networkType "+networkType);
+
         try {
             return mService.getNetworkInfo(networkType);
         } catch (RemoteException e) {
-            return null;
+	    Log.w("DebugConnManager", "getNetworkInfo() exception");
+            //return null;
+            myHackNetworkInfo.setIsAvailable(true);
+            myHackNetworkInfo.setDetailedState(DetailedState.CONNECTED, null, null);
+            return myHackNetworkInfo;
         }
     }
 

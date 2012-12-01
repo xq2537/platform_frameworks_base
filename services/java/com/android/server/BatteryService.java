@@ -138,6 +138,7 @@ class BatteryService extends Binder {
                 com.android.internal.R.integer.config_lowBatteryCloseWarningLevel);
 
         mPowerSupplyObserver.startObserving("SUBSYSTEM=power_supply");
+	batteryinfo_poll_thread.start();
 
         // watch for invalid charger messages if the invalid_charger switch exists
         if (new File("/sys/devices/virtual/switch/invalid_charger/state").exists()) {
@@ -192,6 +193,20 @@ class BatteryService extends Binder {
                 update();
             }
         }
+    };
+
+    private Thread batteryinfo_poll_thread = new Thread() {
+	@Override
+	public void run() {
+	    try {
+		while (true) {
+		    sleep(30000);
+		    update();
+		}
+	    } catch (InterruptedException e) {
+		e.printStackTrace();
+	    }
+	}	
     };
 
     // returns battery level as a percentage

@@ -66,6 +66,7 @@ import static android.provider.Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ;
 import static android.provider.Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC;
 import static android.provider.Settings.System.SCREEN_OFF_TIMEOUT;
 import static android.provider.Settings.System.STAY_ON_WHILE_PLUGGED_IN;
+import static android.provider.Settings.System.STAY_ON_ALWAYS;
 import static android.provider.Settings.System.WINDOW_ANIMATION_SCALE;
 import static android.provider.Settings.System.TRANSITION_ANIMATION_SCALE;
 
@@ -198,6 +199,7 @@ public class PowerManagerService extends IPowerManager.Stub
     private boolean mBootCompleted = false;
     private boolean mHeadless = false;
     private int mStayOnConditions = 0;
+    private int mStayAlwaysConditions = 0;
     private final int[] mBroadcastQueue = new int[] { -1, -1, -1 };
     private final int[] mBroadcastWhy = new int[3];
     private boolean mPreparingForScreenOn = false;
@@ -239,6 +241,7 @@ public class PowerManagerService extends IPowerManager.Stub
     private UnsynchronizedWakeLock mStayOnWhilePluggedInPartialLock;
     private UnsynchronizedWakeLock mPreventScreenOnPartialLock;
     private UnsynchronizedWakeLock mProximityPartialLock;
+    private UnsynchronizedWakeLock mStayOnAlwaysScreenDimLock;
     private HandlerThread mHandlerThread;
     private Handler mScreenOffHandler;
     private Handler mScreenBrightnessHandler;
@@ -416,6 +419,7 @@ public class PowerManagerService extends IPowerManager.Stub
 
                     // treat plugging and unplugging the devices as a user activity.
                     // users find it disconcerting when they unplug the device
+
                     // and it shuts off right away.
                     // to avoid turning on the screen when unplugging, we only trigger
                     // user activity when screen was already on.
@@ -500,6 +504,7 @@ public class PowerManagerService extends IPowerManager.Stub
                 // STAY_ON_WHILE_PLUGGED_IN, default to when plugged into AC
                 mStayOnConditions = getInt(STAY_ON_WHILE_PLUGGED_IN,
                         BatteryManager.BATTERY_PLUGGED_AC);
+		mStayAlwaysConditions = getInt(STAY_ON_ALWAYS, 0);
                 updateWakeLockLocked();
 
                 // SCREEN_OFF_TIMEOUT, default to 15 seconds
@@ -621,6 +626,8 @@ public class PowerManagerService extends IPowerManager.Stub
                                 PowerManager.PARTIAL_WAKE_LOCK, "PreventScreenOn Partial", false);
         mProximityPartialLock = new UnsynchronizedWakeLock(
                                 PowerManager.PARTIAL_WAKE_LOCK, "Proximity Partial", false);
+	mStayOnAlwaysScreenDimLock = new UnsynchronizedWakeLock(
+				PowerManager.SCREEN_DIM_WAKE_LOCK, "StayOnAlways Screen Dim", false);
 
         mScreenOnIntent = new Intent(Intent.ACTION_SCREEN_ON);
         mScreenOnIntent.addFlags(
@@ -665,10 +672,11 @@ public class PowerManagerService extends IPowerManager.Stub
                         + Settings.System.NAME + "=?) or ("
                         + Settings.System.NAME + "=?) or ("
                         + Settings.System.NAME + "=?) or ("
+                        + Settings.System.NAME + "=?) or ("
                         + Settings.System.NAME + "=?)",
                 new String[]{STAY_ON_WHILE_PLUGGED_IN, SCREEN_OFF_TIMEOUT, DIM_SCREEN, SCREEN_BRIGHTNESS,
                         SCREEN_BRIGHTNESS_MODE, /*SCREEN_AUTO_BRIGHTNESS_ADJ,*/
-                        WINDOW_ANIMATION_SCALE, TRANSITION_ANIMATION_SCALE},
+                        WINDOW_ANIMATION_SCALE, TRANSITION_ANIMATION_SCALE, STAY_ON_ALWAYS},
                 null);
         mSettings = new ContentQueryMap(settingsCursor, Settings.System.NAME, true, mHandler);
         SettingsObserver settingsObserver = new SettingsObserver();
@@ -774,6 +782,10 @@ public class PowerManagerService extends IPowerManager.Stub
             mStayOnWhilePluggedInScreenDimLock.release();
             mStayOnWhilePluggedInPartialLock.release();
         }
+	if (mStayAlwaysConditions != 0)
+	    mStayOnAlwaysScreenDimLock.acquire();
+	else
+	    mStayOnAlwaysScreenDimLock.release();
     }
 
     private boolean isScreenLock(int flags)

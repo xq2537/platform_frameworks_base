@@ -73,18 +73,20 @@ public class ImageWallpaper extends WallpaperService {
 
         //noinspection PointlessBooleanExpression,ConstantConditions
         if (FIXED_SIZED_SURFACE && USE_OPENGL) {
+/*
             if (!isEmulator()) {
                 WindowManager windowManager =
                         (WindowManager) getSystemService(Context.WINDOW_SERVICE);
                 Display display = windowManager.getDefaultDisplay();
                 mIsHwAccelerated = ActivityManager.isHighEndGfx(display);
             }
+*/
         }
     }
 
-    private static boolean isEmulator() {
+   /* private static boolean isEmulator() {
         return "1".equals(SystemProperties.get(PROPERTY_KERNEL_QEMU, "0"));
-    }
+    }*/
 
     public Engine onCreateEngine() {
         return new DrawableEngine();

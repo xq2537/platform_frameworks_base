@@ -1151,6 +1151,29 @@ status_t EventHub::openDeviceLocked(const char *devicePath) {
         }
     }
 
+    // Buildroid
+    if (device->classes & (INPUT_DEVICE_CLASS_KEYBOARD | INPUT_DEVICE_CLASS_ALPHAKEY)) {
+        char ignkeyb_property[PROPERTY_VALUE_MAX];
+
+        if (property_get("androVM.keyboard_disable", ignkeyb_property, NULL) > 0) {
+            int ignkeyb = atoi(ignkeyb_property);
+
+            ALOGI("keyboard disable is |%s] [%d]\n", ignkeyb_property, ignkeyb);
+            switch (ignkeyb) {
+             case 1:
+                ALOGI("ignoring event id %s because keyboard disabled by androVM configuration\n", devicePath);
+                close(fd);
+                return -1;
+                break;
+             case 2:
+                ALOGI("removing ALPHAKEY class from %s\n", devicePath);
+                device->classes &= 0xFFFF & ~INPUT_DEVICE_CLASS_ALPHAKEY;
+                ALOGI("new device class: %d\n", device->classes);
+                break;
+            }
+        }
+    }
+
     // If the device isn't recognized as something we handle, don't monitor it.
     if (device->classes == 0) {
         ALOGV("Dropping device: id=%d, path='%s', name='%s'",

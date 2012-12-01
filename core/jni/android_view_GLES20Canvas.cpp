@@ -826,13 +826,16 @@ static jboolean android_view_GLES20Canvas_copyLayer(JNIEnv* env, jobject clazz,
 static jboolean android_view_GLES20Canvas_isAvailable(JNIEnv* env, jobject clazz) {
 #ifdef USE_OPENGL_RENDERER
     char prop[PROPERTY_VALUE_MAX];
+#if 0
     if (property_get("ro.kernel.qemu", prop, NULL) == 0) {
         // not in the emulator
         return JNI_TRUE;
     }
+#endif //0
     // In the emulator this property will be set to 1 when hardware GLES is
     // enabled, 0 otherwise. On old emulator versions it will be undefined.
-    property_get("ro.kernel.qemu.gles", prop, "0");
+    //property_get("ro.kernel.qemu.gles", prop, "0");
+    property_get("androVM.gles.renderer", prop, "0");
     return atoi(prop) == 1 ? JNI_TRUE : JNI_FALSE;
 #else
     return JNI_FALSE;

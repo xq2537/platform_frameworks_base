@@ -1437,6 +1437,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     ("1".equals(SystemProperties.get("ro.kernel.qemu")) ||
                         mContext.getResources().getBoolean(R.bool.def_stay_on_while_plugged_in))
                      ? 1 : 0);
+	    loadSetting(stmt, Settings.System.STAY_ON_ALWAYS, 1 );
             loadIntegerSetting(stmt, Settings.System.SCREEN_OFF_TIMEOUT,
                     R.integer.def_screen_off_timeout);
 
