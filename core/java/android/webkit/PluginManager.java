@@ -116,6 +116,7 @@ public class PluginManager {
         List<ResolveInfo> plugins = pm.queryIntentServices(new Intent(PLUGIN_ACTION),
                 PackageManager.GET_SERVICES | PackageManager.GET_META_DATA);
 
+        directories.add("/system/lib/plugins/com.adobe.flashplayer");
         synchronized(mPackageInfoCache) {
 
             // clear the list of existing packageInfo objects
