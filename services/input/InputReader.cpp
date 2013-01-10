@@ -1262,12 +1262,14 @@ void CursorScrollAccumulator::finishSync() {
 // --- TouchButtonAccumulator ---
 
 TouchButtonAccumulator::TouchButtonAccumulator() :
-        mHaveBtnTouch(false), mHaveStylus(false) {
+        mHaveBtnTouch(false), mHaveStylus(false), mIsAbsoluteMouse(false) {
     clearButtons();
 }
 
 void TouchButtonAccumulator::configure(InputDevice* device) {
     mHaveBtnTouch = device->hasKey(BTN_TOUCH);
+    if (!mHaveBtnTouch && device->hasKey(BTN_MOUSE))
+        mIsAbsoluteMouse = true;
     mHaveStylus = device->hasKey(BTN_TOOL_PEN)
             || device->hasKey(BTN_TOOL_RUBBER)
             || device->hasKey(BTN_TOOL_BRUSH)
@@ -1382,6 +1384,9 @@ int32_t TouchButtonAccumulator::getToolType() const {
     if (mBtnToolFinger || mBtnToolDoubleTap || mBtnToolTripleTap || mBtnToolQuadTap) {
         return AMOTION_EVENT_TOOL_TYPE_FINGER;
     }
+    if (mIsAbsoluteMouse) {
+        return AMOTION_EVENT_TOOL_TYPE_ABSOLUTE_MOUSE;
+    }
     return AMOTION_EVENT_TOOL_TYPE_UNKNOWN;
 }
 
@@ -1389,7 +1394,8 @@ bool TouchButtonAccumulator::isToolActive() const {
     return mBtnTouch || mBtnToolFinger || mBtnToolPen || mBtnToolRubber
             || mBtnToolBrush || mBtnToolPencil || mBtnToolAirbrush
             || mBtnToolMouse || mBtnToolLens
-            || mBtnToolDoubleTap || mBtnToolTripleTap || mBtnToolQuadTap;
+            || mBtnToolDoubleTap || mBtnToolTripleTap || mBtnToolQuadTap
+            || mIsAbsoluteMouse ;
 }
 
 bool TouchButtonAccumulator::isHovering() const {
@@ -3502,6 +3508,8 @@ void TouchInputMapper::reset(nsecs_t when) {
     mLastStylusIdBits.clear();
     mCurrentMouseIdBits.clear();
     mLastMouseIdBits.clear();
+    mCurrentAbsoluteMouseIdBits.clear();
+    mLastAbsoluteMouseIdBits.clear();
     mPointerUsage = POINTER_USAGE_NONE;
     mSentHoverEnter = false;
     mDownTime = 0;
@@ -3565,6 +3573,7 @@ void TouchInputMapper::sync(nsecs_t when) {
     mCurrentFingerIdBits.clear();
     mCurrentStylusIdBits.clear();
     mCurrentMouseIdBits.clear();
+    mCurrentAbsoluteMouseIdBits.clear();
     mCurrentCookedPointerData.clear();
 
     if (mDeviceMode == DEVICE_MODE_DISABLED) {
@@ -3625,6 +3634,8 @@ void TouchInputMapper::sync(nsecs_t when) {
                     mCurrentFingerIdBits.markBit(id);
                 } else if (pointer.toolType == AMOTION_EVENT_TOOL_TYPE_MOUSE) {
                     mCurrentMouseIdBits.markBit(id);
+                } else if (pointer.toolType == AMOTION_EVENT_TOOL_TYPE_ABSOLUTE_MOUSE) {
+                    mCurrentAbsoluteMouseIdBits.markBit(id);
                 }
             }
             for (BitSet32 idBits(mCurrentRawPointerData.hoveringIdBits); !idBits.isEmpty(); ) {
@@ -3640,8 +3651,12 @@ void TouchInputMapper::sync(nsecs_t when) {
             PointerUsage pointerUsage = mPointerUsage;
             if (!mCurrentStylusIdBits.isEmpty()) {
                 mCurrentMouseIdBits.clear();
+                mCurrentAbsoluteMouseIdBits.clear();
                 mCurrentFingerIdBits.clear();
                 pointerUsage = POINTER_USAGE_STYLUS;
+            } else if (!mCurrentAbsoluteMouseIdBits.isEmpty()) {
+                mCurrentFingerIdBits.clear();
+                pointerUsage = POINTER_USAGE_ABSOLUTE_MOUSE;
             } else if (!mCurrentMouseIdBits.isEmpty()) {
                 mCurrentFingerIdBits.clear();
                 pointerUsage = POINTER_USAGE_MOUSE;
@@ -3679,6 +3694,7 @@ void TouchInputMapper::sync(nsecs_t when) {
     mLastFingerIdBits = mCurrentFingerIdBits;
     mLastStylusIdBits = mCurrentStylusIdBits;
     mLastMouseIdBits = mCurrentMouseIdBits;
+    mLastAbsoluteMouseIdBits = mCurrentAbsoluteMouseIdBits;
 
     // Clear some transient state.
     mCurrentRawVScroll = 0;
@@ -4157,6 +4173,9 @@ void TouchInputMapper::dispatchPointerUsage(nsecs_t when, uint32_t policyFlags,
     case POINTER_USAGE_MOUSE:
         dispatchPointerMouse(when, policyFlags);
         break;
+    case POINTER_USAGE_ABSOLUTE_MOUSE:
+        dispatchPointerAbsoluteMouse(when, policyFlags);
+        break;
     default:
         break;
     }
@@ -4171,6 +4190,9 @@ void TouchInputMapper::abortPointerUsage(nsecs_t when, uint32_t policyFlags) {
         abortPointerStylus(when, policyFlags);
         break;
     case POINTER_USAGE_MOUSE:
+        abortPointerMouse(when, policyFlags);
+        break;
+    case POINTER_USAGE_ABSOLUTE_MOUSE:
         abortPointerMouse(when, policyFlags);
         break;
     default:
@@ -5221,6 +5243,54 @@ void TouchInputMapper::dispatchPointerMouse(nsecs_t when, uint32_t policyFlags) 
         } else {
             mPointerVelocityControl.reset();
         }
+
+        down = isPointerDown(mCurrentButtonState);
+        hovering = !down;
+
+        float x, y;
+        mPointerController->getPosition(&x, &y);
+        mPointerSimple.currentCoords.copyFrom(
+                mCurrentCookedPointerData.pointerCoords[currentIndex]);
+        mPointerSimple.currentCoords.setAxisValue(AMOTION_EVENT_AXIS_X, x);
+        mPointerSimple.currentCoords.setAxisValue(AMOTION_EVENT_AXIS_Y, y);
+        mPointerSimple.currentCoords.setAxisValue(AMOTION_EVENT_AXIS_PRESSURE,
+                hovering ? 0.0f : 1.0f);
+        mPointerSimple.currentProperties.id = 0;
+        mPointerSimple.currentProperties.toolType =
+                mCurrentCookedPointerData.pointerProperties[currentIndex].toolType;
+    } else {
+        mPointerVelocityControl.reset();
+
+        down = false;
+        hovering = false;
+    }
+
+    dispatchPointerSimple(when, policyFlags, down, hovering);
+}
+
+void TouchInputMapper::dispatchPointerAbsoluteMouse(nsecs_t when, uint32_t policyFlags) {
+    mPointerSimple.currentCoords.clear();
+    mPointerSimple.currentProperties.clear();
+
+    bool down, hovering;
+    if (!mCurrentAbsoluteMouseIdBits.isEmpty()) {
+        uint32_t id = mCurrentAbsoluteMouseIdBits.firstMarkedBit();
+        uint32_t currentIndex = mCurrentCookedPointerData.idToIndex[id];
+        float xscale = mXScale;
+        float yscale = mYScale;
+        int orient = mAssociatedDisplayOrientation;
+        if ((orient == DISPLAY_ORIENTATION_90) || (orient == DISPLAY_ORIENTATION_270)) {
+            xscale = mYScale;
+            yscale = mXScale;
+        }
+        float cx = mCurrentRawPointerData.pointers[currentIndex].x * xscale;
+        float cy = mCurrentRawPointerData.pointers[currentIndex].y * yscale;
+
+        //rotateDelta(mSurfaceOrientation, &cx, &cy);
+ 
+        ALOGE("orientation=%d scale=%fx%f pos=%fx%f", orient, xscale, yscale, cx, cy);
+
+        mPointerController->setPosition(cx, cy);
 
         down = isPointerDown(mCurrentButtonState);
         hovering = !down;
